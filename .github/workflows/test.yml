@@ -24,6 +24,7 @@ jobs:
       - id: run
         uses: ./
         with:
+          github-token: ${{ github.token }}
           gemfile-path: fixtures/green/Gemfile
           fail-if-warning: 'true'
       - name: Assert exit code 0
@@ -45,6 +46,7 @@ jobs:
         continue-on-error: true
         uses: ./
         with:
+          github-token: ${{ github.token }}
           gemfile-path: fixtures/archived/Gemfile
           fail-if-warning: 'true'
       - name: Assert exit code 1
@@ -65,6 +67,7 @@ jobs:
       - id: run
         uses: ./
         with:
+          github-token: ${{ github.token }}
           gemfile-path: fixtures/green/Gemfile
           sarif: still_active.sarif.json
       - name: Assert SARIF file exists + has runs[]

@@ -47,9 +47,11 @@ inputs:
       instead of an absolute snapshot. Exits 1 on regressions.
     required: false
   github-token:
-    description: 'GitHub token used by still_active to call the GitHub API. Defaults to ${{ github.token }}.'
+    description: |
+      GitHub token used by still_active for the GitHub API.
+      Pass ${{ github.token }} from your workflow if you don't have a dedicated one.
+      Without a token, still_active hits the unauthenticated 60 req/hour limit fast.
     required: false
-    default: ${{ github.token }}
   gitlab-token:
     description: 'GitLab token for GitLab-hosted gems (optional for public repos).'
     required: false

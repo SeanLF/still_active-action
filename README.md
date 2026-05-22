@@ -22,6 +22,7 @@ jobs:
         with: { ruby-version: '3.4' }
       - uses: SeanLF/still_active-action@v0
         with:
+          github-token: ${{ github.token }}
           fail-if-warning: 'true'
           fail-if-vulnerable: 'high'
           sarif: still_active.sarif.json
@@ -46,7 +47,7 @@ Findings will appear in the **Security → Code scanning** tab and as inline ann
 | `output-format` | `terminal`, `markdown`, or `json` | `json` |
 | `sarif` | Path to write SARIF 2.1.0 output to (e.g. `still_active.sarif.json`) | – |
 | `baseline` | Path to baseline JSON snapshot; emits markdown delta, exits 1 on regressions | – |
-| `github-token` | GitHub token | `${{ github.token }}` |
+| `github-token` | GitHub token — pass `${{ github.token }}` explicitly to avoid rate limits | – |
 | `gitlab-token` | GitLab token (optional for public repos) | – |
 | `version` | still_active gem version (`latest` or pinned) | `latest` |
 | `working-directory` | Cwd for the audit | `.` |
