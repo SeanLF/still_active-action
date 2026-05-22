@@ -1,5 +1,8 @@
 # still_active-action
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-still__active-2ea44f?logo=github)](https://github.com/marketplace/actions/still_active)
+[![Self-test](https://github.com/SeanLF/still_active-action/actions/workflows/test.yml/badge.svg)](https://github.com/SeanLF/still_active-action/actions/workflows/test.yml)
+
 GitHub Action wrapping the [`still_active`](https://github.com/SeanLF/still_active) gem — audit your Gemfile for maintenance signals (last commit dates, archived repos, OpenSSF Scorecard, vulnerabilities, libyear, Ruby EOL) directly from CI, with optional SARIF output to GitHub Code Scanning.
 
 ## Quick start
