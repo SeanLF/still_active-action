@@ -1,0 +1,3 @@
+source "https://rubygems.org"
+# nested_form's upstream repo is archived → triggers SA001/fail-if-warning
+gem "nested_form", "0.3.2"

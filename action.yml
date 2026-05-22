@@ -1,0 +1,200 @@
+name: 'still_active'
+description: 'Audit your Gemfile for maintenance signals, vulnerabilities, libyear drift, and archived repositories.'
+author: 'Sean Floyd'
+
+branding:
+  icon: 'activity'
+  color: 'green'
+
+inputs:
+  gemfile-path:
+    description: 'Path to the Gemfile to audit. Defaults to ./Gemfile resolved against the workflow working directory.'
+    required: false
+  gems:
+    description: 'Comma-separated list of gems to audit instead of a Gemfile.'
+    required: false
+  ignore:
+    description: |
+      Gems to exclude from pass/fail checks (still shown in output).
+      Accepts a comma-separated list or a YAML block scalar with one gem per line.
+    required: false
+  fail-if-warning:
+    description: 'Exit 1 if any gem has stale/critical/archived activity. "true" to enable.'
+    required: false
+    default: 'false'
+  fail-if-vulnerable:
+    description: |
+      Exit 1 if any gem has vulnerabilities. "true" for any severity, or one of:
+      low, medium, high, critical to gate at or above that level.
+    required: false
+    default: 'false'
+  fail-if-outdated:
+    description: 'Exit 1 if any gem exceeds the given libyears behind latest (e.g. 3).'
+    required: false
+  output-format:
+    description: 'Output format: terminal, markdown, or json. Defaults to json (CI is non-TTY).'
+    required: false
+    default: 'json'
+  sarif:
+    description: |
+      Emit SARIF 2.1.0 to the given path (e.g. still_active.sarif.json) for GitHub Code Scanning.
+      Pair with github/codeql-action/upload-sarif@v3 in your workflow (and the
+      security-events: write permission). Use "-" to write to stdout.
+    required: false
+  baseline:
+    description: |
+      Path to a baseline still_active JSON snapshot. Emits a markdown delta report
+      instead of an absolute snapshot. Exits 1 on regressions.
+    required: false
+  github-token:
+    description: 'GitHub token used by still_active to call the GitHub API. Defaults to ${{ github.token }}.'
+    required: false
+    default: ${{ github.token }}
+  gitlab-token:
+    description: 'GitLab token for GitLab-hosted gems (optional for public repos).'
+    required: false
+  version:
+    description: 'still_active gem version to install. "latest" or a pinned version like "1.4.0".'
+    required: false
+    default: 'latest'
+  working-directory:
+    description: 'Directory to run the audit from. Defaults to the workflow workspace root.'
+    required: false
+    default: '.'
+  extra-args:
+    description: |
+      Additional raw flags passed to still_active (escape hatch for less common flags like
+      --safe-range-end, --warning-range-end, --simultaneous-requests).
+      WARNING: do not pass user-controlled input here; this value is shell-split.
+    required: false
+
+outputs:
+  exit-code:
+    description: 'Exit code returned by still_active (0 = pass, 1 = gating flag tripped or regression).'
+    value: ${{ steps.run.outputs.exit-code }}
+  report-path:
+    description: 'Path to the captured report file inside the runner.'
+    value: ${{ steps.run.outputs.report-path }}
+  sarif-path:
+    description: 'Path to the SARIF file when --sarif was requested (empty otherwise).'
+    value: ${{ steps.run.outputs.sarif-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_GEMFILE_PATH: ${{ inputs.gemfile-path }}
+        INPUT_GEMS: ${{ inputs.gems }}
+        INPUT_IGNORE: ${{ inputs.ignore }}
+        INPUT_FAIL_IF_WARNING: ${{ inputs.fail-if-warning }}
+        INPUT_FAIL_IF_VULNERABLE: ${{ inputs.fail-if-vulnerable }}
+        INPUT_FAIL_IF_OUTDATED: ${{ inputs.fail-if-outdated }}
+        INPUT_OUTPUT_FORMAT: ${{ inputs.output-format }}
+        INPUT_SARIF: ${{ inputs.sarif }}
+        INPUT_BASELINE: ${{ inputs.baseline }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_GITLAB_TOKEN: ${{ inputs.gitlab-token }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_EXTRA_ARGS: ${{ inputs.extra-args }}
+      run: |
+        set -euo pipefail
+
+        echo "::group::Installing still_active"
+        if [ "${INPUT_VERSION}" = "latest" ]; then
+          gem install still_active --no-document
+        else
+          gem install still_active --no-document --version "${INPUT_VERSION}"
+        fi
+        echo "::endgroup::"
+
+        args=()
+
+        if [ -n "${INPUT_GEMFILE_PATH}" ]; then
+          args+=("--gemfile=${INPUT_GEMFILE_PATH}")
+        fi
+
+        if [ -n "${INPUT_GEMS}" ]; then
+          args+=("--gems=${INPUT_GEMS}")
+        fi
+
+        if [ -n "${INPUT_IGNORE}" ]; then
+          normalised_ignore="$(printf '%s' "${INPUT_IGNORE}" | tr '\n' ',' | sed 's/,,*/,/g; s/^,//; s/,$//')"
+          if [ -n "${normalised_ignore}" ]; then
+            args+=("--ignore=${normalised_ignore}")
+          fi
+        fi
+
+        if [ -n "${INPUT_BASELINE}" ]; then
+          args+=("--baseline=${INPUT_BASELINE}")
+        elif [ -n "${INPUT_SARIF}" ]; then
+          args+=("--sarif=${INPUT_SARIF}")
+          echo "sarif-path=${INPUT_SARIF}" >> "${GITHUB_OUTPUT}"
+        else
+          case "${INPUT_OUTPUT_FORMAT}" in
+            terminal) args+=("--terminal") ;;
+            markdown) args+=("--markdown") ;;
+            json|"") args+=("--json") ;;
+            *)
+              echo "::error::Unknown output-format '${INPUT_OUTPUT_FORMAT}'. Expected terminal, markdown, or json."
+              exit 2
+              ;;
+          esac
+        fi
+
+        if [ "${INPUT_FAIL_IF_WARNING}" = "true" ]; then
+          args+=("--fail-if-warning")
+        fi
+
+        case "${INPUT_FAIL_IF_VULNERABLE}" in
+          ""|false) : ;;
+          true) args+=("--fail-if-vulnerable") ;;
+          low|medium|high|critical) args+=("--fail-if-vulnerable=${INPUT_FAIL_IF_VULNERABLE}") ;;
+          *)
+            echo "::error::fail-if-vulnerable must be true/false or one of: low, medium, high, critical."
+            exit 2
+            ;;
+        esac
+
+        if [ -n "${INPUT_FAIL_IF_OUTDATED}" ]; then
+          args+=("--fail-if-outdated=${INPUT_FAIL_IF_OUTDATED}")
+        fi
+
+        if [ -n "${INPUT_EXTRA_ARGS}" ]; then
+          # shellcheck disable=SC2206
+          extra=( ${INPUT_EXTRA_ARGS} )
+          args+=("${extra[@]}")
+        fi
+
+        report_path="${RUNNER_TEMP:-/tmp}/still_active-report.txt"
+        echo "report-path=${report_path}" >> "${GITHUB_OUTPUT}"
+
+        echo "::group::Running still_active ${args[*]}"
+        set +e
+        GITHUB_TOKEN="${INPUT_GITHUB_TOKEN}" GITLAB_TOKEN="${INPUT_GITLAB_TOKEN}" \
+          still_active "${args[@]}" | tee "${report_path}"
+        exit_code=${PIPESTATUS[0]}
+        set -e
+        echo "::endgroup::"
+
+        echo "exit-code=${exit_code}" >> "${GITHUB_OUTPUT}"
+
+        if [ "${INPUT_OUTPUT_FORMAT}" = "markdown" ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+          {
+            echo "## still_active report"
+            echo
+            cat "${report_path}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+        fi
+
+        if [ -n "${INPUT_BASELINE}" ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+          {
+            echo "## still_active baseline diff"
+            echo
+            cat "${report_path}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+        fi
+
+        exit "${exit_code}"

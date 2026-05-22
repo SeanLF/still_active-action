@@ -1,0 +1,74 @@
+name: Self-test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 1 * *'
+
+permissions:
+  contents: read
+
+jobs:
+  green:
+    name: Green fixture (no regressions, exit 0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - id: run
+        uses: ./
+        with:
+          gemfile-path: fixtures/green/Gemfile
+          fail-if-warning: 'true'
+      - name: Assert exit code 0
+        run: |
+          if [ "${{ steps.run.outputs.exit-code }}" != "0" ]; then
+            echo "::error::Expected exit-code=0 for clean fixture, got '${{ steps.run.outputs.exit-code }}'"
+            exit 1
+          fi
+
+  archived:
+    name: Archived fixture (regression, exit 1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - id: run
+        continue-on-error: true
+        uses: ./
+        with:
+          gemfile-path: fixtures/archived/Gemfile
+          fail-if-warning: 'true'
+      - name: Assert exit code 1
+        run: |
+          if [ "${{ steps.run.outputs.exit-code }}" != "1" ]; then
+            echo "::error::Expected exit-code=1 for archived fixture, got '${{ steps.run.outputs.exit-code }}'"
+            exit 1
+          fi
+
+  sarif:
+    name: SARIF output
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - id: run
+        uses: ./
+        with:
+          gemfile-path: fixtures/green/Gemfile
+          sarif: still_active.sarif.json
+      - name: Assert SARIF file exists + has runs[]
+        run: |
+          test -f still_active.sarif.json
+          jq -e '.runs[0].tool.driver.name == "still_active"' still_active.sarif.json
+          jq -e '.version == "2.1.0"' still_active.sarif.json
