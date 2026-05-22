@@ -21,6 +21,9 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.4'
+      - name: Resolve fixture lockfile
+        working-directory: fixtures/green
+        run: bundle lock
       - id: run
         uses: ./
         with:
@@ -42,6 +45,9 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.4'
+      - name: Resolve fixture lockfile
+        working-directory: fixtures/archived
+        run: bundle lock
       - id: run
         continue-on-error: true
         uses: ./
@@ -64,6 +70,9 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.4'
+      - name: Resolve fixture lockfile
+        working-directory: fixtures/green
+        run: bundle lock
       - id: run
         uses: ./
         with:
