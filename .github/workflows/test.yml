@@ -84,3 +84,51 @@ jobs:
           test -f still_active.sarif.json
           jq -e '.runs[0].tool.driver.name == "still_active"' still_active.sarif.json
           jq -e '.version == "2.1.0"' still_active.sarif.json
+
+  cyclonedx:
+    name: CycloneDX SBOM output
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Resolve fixture lockfile
+        working-directory: fixtures/green
+        run: bundle lock
+      - id: run
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          gemfile-path: fixtures/green/Gemfile
+          cyclonedx: still_active.cdx.json
+          cyclonedx-version: '1.7'
+      - name: Assert a valid CycloneDX SBOM that honours the requested version
+        run: |
+          test -f still_active.cdx.json
+          jq -e '.bomFormat == "CycloneDX"' still_active.cdx.json
+          jq -e '.specVersion == "1.7"' still_active.cdx.json
+          jq -e '(.components | length) > 0' still_active.cdx.json
+
+  dual-source:
+    name: Dual-source vulnerabilities (bundler-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      # No bundle lock here — the fixture ships a committed lockfile pinning a
+      # known-vulnerable version that no longer resolves cleanly.
+      - id: run
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          gemfile-path: fixtures/vulnerable/Gemfile
+          bundler-audit: 'true'
+      - name: Assert ruby-advisory-db advisories were merged in
+        env:
+          REPORT: ${{ steps.run.outputs.report-path }}
+        run: |
+          test -n "$REPORT" && test -f "$REPORT"
+          jq -e '[.gems[].vulnerabilities[]?.source] | any(. == "ruby-advisory-db" or . == "merged")' "$REPORT"
