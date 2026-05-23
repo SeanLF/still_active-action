@@ -1,0 +1,3 @@
+source "https://rubygems.org"
+# rack 2.0.0 has many ruby-advisory-db advisories — exercises the dual-source merge.
+gem "rack", "2.0.0"
