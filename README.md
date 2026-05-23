@@ -50,6 +50,9 @@ Findings will appear in the **Security → Code scanning** tab and as inline ann
 | `output-format` | `terminal`, `markdown`, or `json` | `json` |
 | `sarif` | Path to write SARIF 2.1.0 output to (e.g. `still_active.sarif.json`) | – |
 | `baseline` | Path to baseline JSON snapshot; emits markdown delta, exits 1 on regressions | – |
+| `cyclonedx` | Path to write a CycloneDX SBOM to, or `-` for stdout (still_active ≥ 1.5.0) | – |
+| `cyclonedx-version` | CycloneDX spec version: `1.6` (default) or `1.7`; only with `cyclonedx` | – |
+| `bundler-audit` | Install bundler-audit + fetch ruby-advisory-db for dual-source vulns (`true`/`false`, still_active ≥ 1.5.0) | `false` |
 | `github-token` | GitHub token — pass `${{ github.token }}` explicitly to avoid rate limits | – |
 | `gitlab-token` | GitLab token (optional for public repos) | – |
 | `version` | still_active gem version (`latest` or pinned) | `latest` |
@@ -63,14 +66,18 @@ Findings will appear in the **Security → Code scanning** tab and as inline ann
 | `exit-code` | 0 = pass, 1 = gating flag tripped or regression |
 | `report-path` | Path to the captured report inside the runner |
 | `sarif-path` | Path to the SARIF file when `--sarif` was requested |
+| `cyclonedx-path` | Path to the CycloneDX SBOM when `cyclonedx` wrote to a file (empty for stdout) |
 
 ## Modes
 
-The action runs in one of three modes, in this precedence:
+The action runs in one of four output modes, in this precedence:
 
 1. **Baseline diff** — if `baseline` is set, compares current state against the file and emits a markdown delta. Exits 1 on regressions. Other format inputs are ignored.
 2. **SARIF** — if `sarif` is set, writes SARIF 2.1.0 to the given path (`-` for stdout).
-3. **Format** — otherwise emits `output-format` (terminal/markdown/json). Markdown also lands in the job summary.
+3. **CycloneDX** — if `cyclonedx` is set, emits a CycloneDX SBOM to the given path (`-` for stdout). Writing to a file? Add your own upload step (e.g. `actions/upload-artifact` pointing at the `cyclonedx-path` output) — the action does not persist the file. `-` (stdout) is captured into `report-path`.
+4. **Format** — otherwise emits `output-format` (terminal/markdown/json). Markdown also lands in the job summary.
+
+`bundler-audit` is **not** an output mode — it's an independent toggle that adds ruby-advisory-db as a second vulnerability source, and can be combined with any of the modes above.
 
 ## Pinning
 
