@@ -55,6 +55,14 @@ inputs:
   cyclonedx-version:
     description: 'CycloneDX spec version to emit: 1.6 (default) or 1.7. Only applies with cyclonedx.'
     required: false
+  alternatives:
+    description: |
+      Suggest up to three maintained alternative gems (Ruby Toolbox leads, ranked by
+      downloads) for gems flagged archived/critical. Leads to verify, not vetted
+      recommendations; silent when the catalog has no entry. "true" to enable.
+      Requires still_active >= 1.6.0.
+    required: false
+    default: 'false'
   bundler-audit:
     description: |
       Install bundler-audit and fetch ruby-advisory-db so still_active merges its advisories
@@ -118,6 +126,7 @@ runs:
         INPUT_BASELINE: ${{ inputs.baseline }}
         INPUT_CYCLONEDX: ${{ inputs.cyclonedx }}
         INPUT_CYCLONEDX_VERSION: ${{ inputs.cyclonedx-version }}
+        INPUT_ALTERNATIVES: ${{ inputs.alternatives }}
         INPUT_BUNDLER_AUDIT: ${{ inputs.bundler-audit }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
         INPUT_GITLAB_TOKEN: ${{ inputs.gitlab-token }}
@@ -208,6 +217,11 @@ runs:
 
         if [ -n "${INPUT_FAIL_IF_OUTDATED}" ]; then
           args+=("--fail-if-outdated=${INPUT_FAIL_IF_OUTDATED}")
+        fi
+
+        # Independent modifier: works alongside any output mode (terminal/markdown/json/sarif).
+        if [ "${INPUT_ALTERNATIVES}" = "true" ]; then
+          args+=("--alternatives")
         fi
 
         if [ -n "${INPUT_EXTRA_ARGS}" ]; then

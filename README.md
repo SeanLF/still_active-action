@@ -52,6 +52,7 @@ Findings will appear in the **Security → Code scanning** tab and as inline ann
 | `baseline` | Path to baseline JSON snapshot; emits markdown delta, exits 1 on regressions | – |
 | `cyclonedx` | Path to write a CycloneDX SBOM to, or `-` for stdout (still_active ≥ 1.5.0) | – |
 | `cyclonedx-version` | CycloneDX spec version: `1.6` (default) or `1.7`; only with `cyclonedx` | – |
+| `alternatives` | Suggest maintained alternatives (Ruby Toolbox leads) for archived/critical gems (`true`/`false`, still_active ≥ 1.6.0) | `false` |
 | `bundler-audit` | Install bundler-audit + fetch ruby-advisory-db for dual-source vulns (`true`/`false`, still_active ≥ 1.5.0) | `false` |
 | `github-token` | GitHub token — pass `${{ github.token }}` explicitly to avoid rate limits | – |
 | `gitlab-token` | GitLab token (optional for public repos) | – |
@@ -77,7 +78,7 @@ The action runs in one of four output modes, in this precedence:
 3. **CycloneDX** — if `cyclonedx` is set, emits a CycloneDX SBOM to the given path (`-` for stdout). Writing to a file? Add your own upload step (e.g. `actions/upload-artifact` pointing at the `cyclonedx-path` output) — the action does not persist the file. `-` (stdout) is captured into `report-path`.
 4. **Format** — otherwise emits `output-format` (terminal/markdown/json). Markdown also lands in the job summary.
 
-`bundler-audit` is **not** an output mode — it's an independent toggle that adds ruby-advisory-db as a second vulnerability source, and can be combined with any of the modes above.
+`bundler-audit` and `alternatives` are **not** output modes — they're independent toggles (a second vulnerability source, and Ruby Toolbox replacement leads for archived/critical gems) that combine with any of the modes above. Leads render in terminal/markdown/json/sarif; they have no effect under `baseline` or `cyclonedx`.
 
 ## Pinning
 

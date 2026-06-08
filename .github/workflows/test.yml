@@ -132,3 +132,27 @@ jobs:
         run: |
           test -n "$REPORT" && test -f "$REPORT"
           jq -e '[.gems[].vulnerabilities[]?.source] | any(. == "ruby-advisory-db" or . == "merged")' "$REPORT"
+
+  alternatives:
+    name: Alternative gem leads
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Resolve fixture lockfile
+        working-directory: fixtures/archived
+        run: bundle lock
+      - id: run
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          gemfile-path: fixtures/archived/Gemfile
+          alternatives: 'true'
+      - name: Assert maintained leads were attached to the archived gem
+        env:
+          REPORT: ${{ steps.run.outputs.report-path }}
+        run: |
+          test -n "$REPORT" && test -f "$REPORT"
+          jq -e '.gems.nested_form.alternatives | length > 0' "$REPORT"
