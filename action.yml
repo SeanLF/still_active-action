@@ -66,10 +66,10 @@ inputs:
   bundler-audit:
     description: |
       Install bundler-audit and fetch ruby-advisory-db so still_active merges its advisories
-      with deps.dev (dual-source vulnerabilities, deduplicated). "true" to enable.
-      Requires still_active >= 1.5.0.
+      with deps.dev (dual-source vulnerabilities, deduplicated). On by default; set "false"
+      to skip the install (~10s) and run deps.dev only. Requires still_active >= 1.5.0.
     required: false
-    default: 'false'
+    default: 'true'
   github-token:
     description: >-
       GitHub token used by still_active for the GitHub API. Pass the workflow's

@@ -53,7 +53,7 @@ Findings will appear in the **Security → Code scanning** tab and as inline ann
 | `cyclonedx` | Path to write a CycloneDX SBOM to, or `-` for stdout (still_active ≥ 1.5.0) | – |
 | `cyclonedx-version` | CycloneDX spec version: `1.6` (default) or `1.7`; only with `cyclonedx` | – |
 | `alternatives` | Suggest maintained alternatives (Ruby Toolbox leads) for archived/critical gems (`true`/`false`, still_active ≥ 1.6.0) | `false` |
-| `bundler-audit` | Install bundler-audit + fetch ruby-advisory-db for dual-source vulns (`true`/`false`, still_active ≥ 1.5.0) | `false` |
+| `bundler-audit` | Install bundler-audit + fetch ruby-advisory-db for dual-source vulns (`true`/`false`, still_active ≥ 1.5.0) | `true` |
 | `github-token` | GitHub token — pass `${{ github.token }}` explicitly to avoid rate limits | – |
 | `gitlab-token` | GitLab token (optional for public repos) | – |
 | `version` | still_active gem version (`latest` or pinned) | `latest` |
