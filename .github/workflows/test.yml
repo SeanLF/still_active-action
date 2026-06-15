@@ -30,6 +30,7 @@ jobs:
           github-token: ${{ github.token }}
           gemfile-path: fixtures/green/Gemfile
           fail-if-warning: 'true'
+          bundler-audit: 'false'
       - name: Assert exit code 0
         run: |
           if [ "${{ steps.run.outputs.exit-code }}" != "0" ]; then
@@ -55,6 +56,7 @@ jobs:
           github-token: ${{ github.token }}
           gemfile-path: fixtures/archived/Gemfile
           fail-if-warning: 'true'
+          bundler-audit: 'false'
       - name: Assert exit code 1
         run: |
           if [ "${{ steps.run.outputs.exit-code }}" != "1" ]; then
@@ -79,6 +81,7 @@ jobs:
           github-token: ${{ github.token }}
           gemfile-path: fixtures/green/Gemfile
           sarif: still_active.sarif.json
+          bundler-audit: 'false'
       - name: Assert SARIF file exists + has runs[]
         run: |
           test -f still_active.sarif.json
@@ -103,6 +106,7 @@ jobs:
           gemfile-path: fixtures/green/Gemfile
           cyclonedx: still_active.cdx.json
           cyclonedx-version: '1.7'
+          bundler-audit: 'false'
       - name: Assert a valid CycloneDX SBOM that honours the requested version
         run: |
           test -f still_active.cdx.json
@@ -150,6 +154,7 @@ jobs:
           github-token: ${{ github.token }}
           gemfile-path: fixtures/archived/Gemfile
           alternatives: 'true'
+          bundler-audit: 'false'
       - name: Assert maintained leads were attached to the archived gem
         env:
           REPORT: ${{ steps.run.outputs.report-path }}

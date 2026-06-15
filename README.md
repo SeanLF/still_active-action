@@ -78,7 +78,7 @@ The action runs in one of four output modes, in this precedence:
 3. **CycloneDX** — if `cyclonedx` is set, emits a CycloneDX SBOM to the given path (`-` for stdout). Writing to a file? Add your own upload step (e.g. `actions/upload-artifact` pointing at the `cyclonedx-path` output) — the action does not persist the file. `-` (stdout) is captured into `report-path`.
 4. **Format** — otherwise emits `output-format` (terminal/markdown/json). Markdown also lands in the job summary.
 
-`bundler-audit` and `alternatives` are **not** output modes — they're independent toggles (a second vulnerability source, and Ruby Toolbox replacement leads for archived/critical gems) that combine with any of the modes above. Leads render in terminal/markdown/json/sarif; they have no effect under `baseline` or `cyclonedx`.
+`bundler-audit` and `alternatives` are **not** output modes — they're independent toggles (a second vulnerability source, on by default; and Ruby Toolbox replacement leads for archived/critical gems, opt-in) that combine with any of the modes above. Leads render in terminal/markdown/json/sarif; they have no effect under `baseline` or `cyclonedx`.
 
 ## Pinning
 
