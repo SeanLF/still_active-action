@@ -54,6 +54,7 @@ Findings will appear in the **Security → Code scanning** tab and as inline ann
 | `cyclonedx-version` | CycloneDX spec version: `1.6` (default) or `1.7`; only with `cyclonedx` | – |
 | `alternatives` | Suggest maintained alternatives (Ruby Toolbox leads) for archived/critical gems (`true`/`false`, still_active ≥ 1.6.0) | `false` |
 | `bundler-audit` | Install bundler-audit + fetch ruby-advisory-db for dual-source vulns (`true`/`false`, still_active ≥ 1.5.0) | `true` |
+| `cvss-suite` | Install cvss-suite to score CVSS-4.0-only advisories (`true`/`false`, still_active ≥ 3.0.0; see [Upgrading to still_active 3.0](#upgrading-to-still_active-30)) | `false` |
 | `github-token` | GitHub token — pass `${{ github.token }}` explicitly to avoid rate limits | – |
 | `gitlab-token` | GitLab token (optional for public repos) | – |
 | `version` | still_active gem version (`latest` or pinned) | `latest` |
@@ -79,6 +80,20 @@ The action runs in one of four output modes, in this precedence:
 4. **Format** — otherwise emits `output-format` (terminal/markdown/json). Markdown also lands in the job summary.
 
 `bundler-audit` and `alternatives` are **not** output modes — they're independent toggles (a second vulnerability source, on by default; and Ruby Toolbox replacement leads for archived/critical gems, opt-in) that combine with any of the modes above. Leads render in terminal/markdown/json/sarif; they have no effect under `baseline` or `cyclonedx`.
+
+## Upgrading to still_active 3.0
+
+The action installs `still_active` at `version: latest` by default, so **still_active 3.0 rolls out on your next run with no change to your workflow.** One behaviour change can turn a previously-green run red without you touching anything:
+
+**`fail-if-vulnerable` now fails closed on unscored advisories.** Before 3.0, an advisory with no CVSS score read as "below threshold" and silently cleared the severity gate — so a real, freshly disclosed CVE could pass (scoring lags disclosure, worst case). From 3.0, an unscored advisory that isn't explicitly suppressed **trips the gate** and the run exits 1, with a per-gem note on stderr explaining why. This is a fix, not a regression: those advisories should have been failing all along.
+
+If a run goes green → red after the upgrade, you have three levers:
+
+- **Enable `cvss-suite: 'true'`.** Some advisories are unscored only because they publish a CVSS **4.0** vector and nothing else; still_active needs the optional `cvss-suite` gem to read a 4.0 vector. Installing it lets those advisories score, and they clear the gate when they land below your threshold.
+- **Accept a specific finding** in a committed `.still_active.yml` (a vulnerability suppression must name an explicit advisory id, so a *newly* disclosed CVE on the same gem still fails). This is the right move for an advisory you've reviewed and decided to carry.
+- **Pin `version:`** to a `2.x` release to defer the change while you triage. Deferral, not a fix — the fail-open it closes is a real one.
+
+The `cvss-suite` input is opt-in (`false` by default) and mirrors the `bundler-audit` toggle: it adds one `gem install` step, best-effort (a failed install never aborts the audit — the advisory just stays unscored).
 
 ## Pinning
 

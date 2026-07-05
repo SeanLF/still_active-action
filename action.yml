@@ -70,6 +70,15 @@ inputs:
       to skip the install (~10s) and run deps.dev only. Requires still_active >= 1.5.0.
     required: false
     default: 'true'
+  cvss-suite:
+    description: |
+      Install cvss-suite so still_active can score advisories that publish only a CVSS 4.0
+      vector (no CVSS 3.x, no numeric score). Without it those advisories stay unscored, and
+      under still_active >= 3.0.0 an unscored advisory fails the fail-if-vulnerable severity
+      gate closed (see the upgrade note in the README). Opt-in; set "true" to enable.
+      Requires still_active >= 3.0.0.
+    required: false
+    default: 'false'
   github-token:
     description: >-
       GitHub token used by still_active for the GitHub API. Pass the workflow's
@@ -128,6 +137,7 @@ runs:
         INPUT_CYCLONEDX_VERSION: ${{ inputs.cyclonedx-version }}
         INPUT_ALTERNATIVES: ${{ inputs.alternatives }}
         INPUT_BUNDLER_AUDIT: ${{ inputs.bundler-audit }}
+        INPUT_CVSS_SUITE: ${{ inputs.cvss-suite }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
         INPUT_GITLAB_TOKEN: ${{ inputs.gitlab-token }}
         INPUT_VERSION: ${{ inputs.version }}
@@ -154,6 +164,22 @@ runs:
             echo "ruby-advisory-db ready; still_active will merge deps.dev + ruby-advisory-db"
           else
             echo "::warning::bundler-audit setup failed; still_active will use deps.dev only"
+          fi
+          echo "::endgroup::"
+        fi
+
+        # Optional CVSS 4.0 scorer. still_active soft-requires cvss-suite at runtime; with it
+        # installed, advisories that carry only a CVSS 4.0 vector get a numeric score and can
+        # clear the fail-if-vulnerable severity gate when they land below threshold. Without it
+        # (still_active >= 3.0.0) those advisories stay unscored and fail the gate closed.
+        if [ "${INPUT_CVSS_SUITE}" = "true" ]; then
+          echo "::group::Installing cvss-suite (CVSS 4.0 scoring)"
+          # Best-effort: a failed install (set -e is active) must not abort the audit —
+          # still_active just leaves CVSS-4-only advisories unscored (fail-closed under the gate).
+          if gem install cvss-suite --no-document; then
+            echo "cvss-suite ready; still_active will score CVSS-4-only advisories"
+          else
+            echo "::warning::cvss-suite install failed; CVSS-4-only advisories stay unscored"
           fi
           echo "::endgroup::"
         fi
