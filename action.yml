@@ -174,7 +174,7 @@ runs:
         # (still_active >= 3.0.0) those advisories stay unscored and fail the gate closed.
         if [ "${INPUT_CVSS_SUITE}" = "true" ]; then
           echo "::group::Installing cvss-suite (CVSS 4.0 scoring)"
-          # Best-effort: a failed install (set -e is active) must not abort the audit —
+          # Best-effort: a failed install (set -e is active) must not abort the audit;
           # still_active just leaves CVSS-4-only advisories unscored (fail-closed under the gate).
           if gem install cvss-suite --no-document; then
             echo "cvss-suite ready; still_active will score CVSS-4-only advisories"

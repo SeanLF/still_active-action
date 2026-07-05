@@ -85,15 +85,15 @@ The action runs in one of four output modes, in this precedence:
 
 The action installs `still_active` at `version: latest` by default, so **still_active 3.0 rolls out on your next run with no change to your workflow.** One behaviour change can turn a previously-green run red without you touching anything:
 
-**`fail-if-vulnerable` now fails closed on unscored advisories.** Before 3.0, an advisory with no CVSS score read as "below threshold" and silently cleared the severity gate — so a real, freshly disclosed CVE could pass (scoring lags disclosure, worst case). From 3.0, an unscored advisory that isn't explicitly suppressed **trips the gate** and the run exits 1, with a per-gem note on stderr explaining why. This is a fix, not a regression: those advisories should have been failing all along.
+**`fail-if-vulnerable` now fails closed on unscored advisories.** Before 3.0, an advisory with no CVSS score read as "below threshold" and silently cleared the severity gate, so a real, freshly disclosed CVE could pass (scoring lags disclosure, worst case). From 3.0, an unscored advisory that isn't explicitly suppressed **trips the gate** and the run exits 1, with a per-gem note on stderr explaining why. This is a fix, not a regression: those advisories should have been failing all along.
 
 If a run goes green → red after the upgrade, you have three levers:
 
 - **Enable `cvss-suite: 'true'`.** Some advisories are unscored only because they publish a CVSS **4.0** vector and nothing else; still_active needs the optional `cvss-suite` gem to read a 4.0 vector. Installing it lets those advisories score, and they clear the gate when they land below your threshold.
 - **Accept a specific finding** in a committed `.still_active.yml` (a vulnerability suppression must name an explicit advisory id, so a *newly* disclosed CVE on the same gem still fails). This is the right move for an advisory you've reviewed and decided to carry.
-- **Pin `version:`** to a `2.x` release to defer the change while you triage. Deferral, not a fix — the fail-open it closes is a real one.
+- **Pin `version:`** to a `2.x` release to defer the change while you triage. Deferral, not a fix; the fail-open it closes is a real one.
 
-The `cvss-suite` input is opt-in (`false` by default) and mirrors the `bundler-audit` toggle: it adds one `gem install` step, best-effort (a failed install never aborts the audit — the advisory just stays unscored).
+The `cvss-suite` input is opt-in (`false` by default) and mirrors the `bundler-audit` toggle: it adds one `gem install` step, best-effort (a failed install never aborts the audit, the advisory just stays unscored).
 
 ## Pinning
 
