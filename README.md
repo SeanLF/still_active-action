@@ -75,11 +75,12 @@ Read the gem's [Upgrading to 3.0](https://github.com/SeanLF/still_active/blob/ma
 | `gems` | Comma-separated gem list (alternative to `gemfile-path`) | – |
 | `sbom` | Path to a CycloneDX SBOM to audit cross-ecosystem instead of a Gemfile (still_active ≥ 3.0.0) | – |
 | `ignore` | Gems to exclude from pass/fail (comma list or YAML block) | – |
+| `fail-if-critical` | Exit 1 only on critical/archived activity, ignoring the stale/warning band (the narrower sibling of `fail-if-warning`) | `false` |
 | `fail-if-warning` | Exit 1 on stale/critical/archived activity (`true`/`false`) | `false` |
 | `fail-if-vulnerable` | Exit 1 on vulns; `true`/`false` or `low`/`medium`/`high`/`critical` | `false` |
 | `fail-if-outdated` | Exit 1 if any gem exceeds N libyears behind latest | – |
 | `fail-if-poison` | Exit 1 on a poison-pill cap; `true`/`false` or `note`/`warning`/`critical` (still_active ≥ 3.0.0) | `false` |
-| `fail-if-deprecated` | Exit 1 if a dependency's maintainer has deprecated it. No tier: a deprecation is declared, not scored. Needs still_active > 3.0.0.rc6 | `false` |
+| `fail-if-deprecated` | Exit 1 if a dependency's maintainer has deprecated it. No tier: a deprecation is declared, not scored. Requires still_active >= 3.0.0 | `false` |
 | `fail-if-language-ceiling` | Exit 1 on an EOL language-runtime ceiling; `true`/`false` or `note`/`warning`/`critical` (still_active ≥ 3.0.0) | `false` |
 | `output-format` | `terminal`, `markdown`, or `json` | `json` |
 | `sarif` | Path to write SARIF 2.1.0 output to (e.g. `still_active.sarif.json`) | – |
@@ -139,7 +140,7 @@ Constraints, all enforced by the action before it installs anything, so a mis-wi
 
 - `sbom` is **mutually exclusive** with `gemfile-path` and `gems`. Pick one input source.
 - `sbom` does **not** support `baseline`: a maintenance-regression diff needs the native audit's gems/ruby snapshot, which a cross-ecosystem SBOM can't supply. Use `sarif`, or `output-format` `terminal`/`markdown`/`json`.
-- `sbom` **does** support `cyclonedx`, and the combination is the interesting one: SBOM in, **enriched SBOM out**. The input is re-emitted with still_active's maintenance signals attached as `still_active:`-namespaced component properties (status, archived, deprecated, scorecard, libyear, last commit, ecosystem, direct-vs-transitive) plus the advisories as CycloneDX `vulnerabilities`, so it can be fed to Dependency-Track rather than only read by a human. Every component keeps the PURL it arrived with, so whatever matched your input matches the output. Unlike the constraints above this one is **not** enforced before install, because it depends on the gem: it needs a still_active newer than `3.0.0.rc6`, and on an older one the run reaches still_active and exits 2. Pin `version:` accordingly.
+- `sbom` **does** support `cyclonedx`, and the combination is the interesting one: SBOM in, **enriched SBOM out**. The input is re-emitted with still_active's maintenance signals attached as `still_active:`-namespaced component properties (status, archived, deprecated, scorecard, libyear, last commit, ecosystem, direct-vs-transitive) plus the advisories as CycloneDX `vulnerabilities`, so it can be fed to Dependency-Track rather than only read by a human. Every component keeps the PURL it arrived with, so whatever matched your input matches the output. Unlike the constraints above this one is **not** enforced before install, because it depends on the gem: it requires still_active >= 3.0.0, and on an older one the run reaches still_active and exits 2.
 - Findings are named `ecosystem/name` (e.g. `npm/left-pad`), which is also the identity `ignore` and `.still_active.yml` suppressions key on. SARIF anchors them to the SBOM file, since there is no lockfile to annotate.
 - The SBOM is treated as untrusted input: only ecosystem, name, and version are read from it, and repositories are discovered from deps.dev rather than any URL the file supplies. Anything unassessable (an unsupported ecosystem, a missing version, a failed lookup) is listed rather than silently dropped.
 

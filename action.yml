@@ -20,13 +20,20 @@ inputs:
       signals gems do. Mutually exclusive with gemfile-path and gems, and does not
       support baseline (use sarif, cyclonedx, or output-format terminal/markdown/json).
       Requires still_active >= 3.0.0; combining it with cyclonedx, which emits an
-      enriched SBOM, needs a newer still_active than 3.0.0.rc6.
+      enriched SBOM, requires still_active >= 3.0.0.
     required: false
   ignore:
     description: |
       Gems to exclude from pass/fail checks (still shown in output).
       Accepts a comma-separated list or a YAML block scalar with one gem per line.
     required: false
+  fail-if-critical:
+    description: |
+      Exit 1 only if a gem's activity is critical or archived, ignoring the milder
+      stale/warning band. The narrower sibling of fail-if-warning; use this when a
+      warning-level finding should not fail the build. "true" to enable.
+    required: false
+    default: 'false'
   fail-if-warning:
     description: 'Exit 1 if any gem has stale/critical/archived activity. "true" to enable.'
     required: false
@@ -54,8 +61,8 @@ inputs:
       registry. A boolean with no tier, because a deprecation is not scored: the
       maintainer either declared it or did not. The only gate that can fire on a
       package every date-based signal reads as healthy, so it is worth enabling
-      alongside the activity gates rather than instead of them. Requires a
-      still_active newer than 3.0.0.rc6.
+      alongside the activity gates rather than instead of them. Requires
+      still_active >= 3.0.0.
     required: false
     default: 'false'
   fail-if-language-ceiling:
@@ -172,6 +179,7 @@ runs:
         INPUT_GEMS: ${{ inputs.gems }}
         INPUT_SBOM: ${{ inputs.sbom }}
         INPUT_IGNORE: ${{ inputs.ignore }}
+        INPUT_FAIL_IF_CRITICAL: ${{ inputs.fail-if-critical }}
         INPUT_FAIL_IF_DEPRECATED: ${{ inputs.fail-if-deprecated }}
         INPUT_FAIL_IF_WARNING: ${{ inputs.fail-if-warning }}
         INPUT_FAIL_IF_VULNERABLE: ${{ inputs.fail-if-vulnerable }}
@@ -317,6 +325,10 @@ runs:
               exit 2
               ;;
           esac
+        fi
+
+        if [ "${INPUT_FAIL_IF_CRITICAL}" = "true" ]; then
+          args+=("--fail-if-critical")
         fi
 
         if [ "${INPUT_FAIL_IF_DEPRECATED}" = "true" ]; then
