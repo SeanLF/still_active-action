@@ -137,6 +137,103 @@ jobs:
           test -n "$REPORT" && test -f "$REPORT"
           jq -e '[.gems[].vulnerabilities[]?.source] | any(. == "ruby-advisory-db" or . == "merged")' "$REPORT"
 
+  sbom:
+    name: Cross-ecosystem SBOM audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - id: run
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          sbom: fixtures/sbom/sbom.cdx.json
+          bundler-audit: 'false'
+          # --sbom landed in 3.0.0, still a prerelease, so `latest` (2.0.0) can't
+          # run this job. Drop the pin once 3.0.0 is published non-prerelease.
+          version: '3.0.0.rc6'
+      - name: Assert every fixture package was assessed across all four ecosystems
+        env:
+          REPORT: ${{ steps.run.outputs.report-path }}
+        run: |
+          test -n "$REPORT" && test -f "$REPORT"
+          jq -e '.summary.total_assessed == 4' "$REPORT"
+          jq -e '.summary.unassessable_count == 0' "$REPORT"
+          jq -e '[.dependencies | keys[] | split("/")[0]] | unique == ["cargo", "go", "npm", "pypi"]' "$REPORT"
+
+  sbom-conflict:
+    name: SBOM input conflicts fail fast
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - id: source
+        continue-on-error: true
+        uses: ./
+        with:
+          sbom: fixtures/sbom/sbom.cdx.json
+          gemfile-path: fixtures/green/Gemfile
+      - id: output-mode
+        continue-on-error: true
+        uses: ./
+        with:
+          sbom: fixtures/sbom/sbom.cdx.json
+          baseline: baseline.json
+      - name: Assert both conflicts failed before installing anything
+        run: |
+          if [ "${{ steps.source.outcome }}" != "failure" ]; then
+            echo "::error::Expected sbom + gemfile-path to fail, got '${{ steps.source.outcome }}'"
+            exit 1
+          fi
+          if [ "${{ steps.output-mode.outcome }}" != "failure" ]; then
+            echo "::error::Expected sbom + baseline to fail, got '${{ steps.output-mode.outcome }}'"
+            exit 1
+          fi
+
+  gates:
+    name: Poison-pill + language-ceiling gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Resolve fixture lockfile
+        working-directory: fixtures/green
+        run: bundle lock
+      - id: run
+        # Either gate may legitimately trip (exit 1) as the fixture's upstreams
+        # drift; what this job pins down is that still_active accepts the flags
+        # and tier values the arg builder emits.
+        continue-on-error: true
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          gemfile-path: fixtures/green/Gemfile
+          fail-if-poison: 'note'
+          fail-if-language-ceiling: 'note'
+          bundler-audit: 'false'
+          # Both gates landed in 3.0.0, still a prerelease, so `latest` (2.0.0)
+          # would reject them. Drop the pin once 3.0.0 ships non-prerelease.
+          version: '3.0.0.rc6'
+      - name: Assert the gates parsed (exit 2 means a rejected flag or tier)
+        run: |
+          if [ "${{ steps.run.outputs.exit-code }}" = "2" ]; then
+            echo "::error::still_active rejected a gate flag or tier value"
+            exit 1
+          fi
+          case "${{ steps.run.outputs.exit-code }}" in
+            0|1) ;;
+            *)
+              echo "::error::Expected exit-code 0 or 1, got '${{ steps.run.outputs.exit-code }}'"
+              exit 1
+              ;;
+          esac
+
   alternatives:
     name: Alternative gem leads
     runs-on: ubuntu-latest

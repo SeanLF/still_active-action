@@ -1,5 +1,5 @@
 name: 'still_active'
-description: 'Audit your Gemfile for maintenance signals, vulnerabilities, libyear drift, and archived repositories.'
+description: 'Audit your Gemfile or a CycloneDX SBOM for maintenance signals, vulnerabilities, libyear drift, and archived repositories.'
 author: 'Sean Floyd'
 
 branding:
@@ -12,6 +12,14 @@ inputs:
     required: false
   gems:
     description: 'Comma-separated list of gems to audit instead of a Gemfile.'
+    required: false
+  sbom:
+    description: |
+      Path to a CycloneDX SBOM (e.g. from Syft or Trivy) to audit cross-ecosystem:
+      npm, PyPI, Cargo, Go, Maven, and NuGet packages get the same maintenance
+      signals gems do. Mutually exclusive with gemfile-path and gems, and does not
+      support baseline or cyclonedx (use sarif, or output-format terminal/markdown/json).
+      Requires still_active >= 3.0.0.
     required: false
   ignore:
     description: |
@@ -31,6 +39,23 @@ inputs:
   fail-if-outdated:
     description: 'Exit 1 if any gem exceeds the given libyears behind latest (e.g. 3).'
     required: false
+  fail-if-poison:
+    description: |
+      Exit 1 on a poison-pill: a dormant or archived package capping one of its
+      runtime dependencies below that dependency's latest major, a ceiling no
+      upstream release will lift. "true" gates at warning and above (the default
+      tier), or name a tier: note, warning, critical. Requires still_active >= 3.0.0.
+    required: false
+    default: 'false'
+  fail-if-language-ceiling:
+    description: |
+      Exit 1 when a pinned dependency strands you on an end-of-life language
+      runtime (its required_ruby_version / requires_python forbids a supported one).
+      "true" gates the critical tier only (EOL-forced, the default), or name a tier:
+      note also gates the latest-not-yet FYI tier; warning behaves as critical,
+      since ceilings are only ever critical or note. Requires still_active >= 3.0.0.
+    required: false
+    default: 'false'
   output-format:
     description: 'Output format: terminal, markdown, or json. Defaults to json (CI is non-TTY).'
     required: false
@@ -88,6 +113,14 @@ inputs:
   gitlab-token:
     description: 'GitLab token for GitLab-hosted gems (optional for public repos).'
     required: false
+  ecosystems-email:
+    description: |
+      Contact email joining ecosyste.ms's polite pool (a higher rate limit).
+      still_active queries ecosyste.ms for declared dependency constraints (the
+      poison-pill signal) on any run, and for GitHub repo signals when no
+      github-token is set. Echoed in the workflow log with the rest of the command,
+      so prefer a role address over a personal one. Requires still_active >= 3.0.0.
+    required: false
   version:
     description: 'still_active gem version to install. "latest" or a pinned version like "1.4.0".'
     required: false
@@ -126,10 +159,13 @@ runs:
       env:
         INPUT_GEMFILE_PATH: ${{ inputs.gemfile-path }}
         INPUT_GEMS: ${{ inputs.gems }}
+        INPUT_SBOM: ${{ inputs.sbom }}
         INPUT_IGNORE: ${{ inputs.ignore }}
         INPUT_FAIL_IF_WARNING: ${{ inputs.fail-if-warning }}
         INPUT_FAIL_IF_VULNERABLE: ${{ inputs.fail-if-vulnerable }}
         INPUT_FAIL_IF_OUTDATED: ${{ inputs.fail-if-outdated }}
+        INPUT_FAIL_IF_POISON: ${{ inputs.fail-if-poison }}
+        INPUT_FAIL_IF_LANGUAGE_CEILING: ${{ inputs.fail-if-language-ceiling }}
         INPUT_OUTPUT_FORMAT: ${{ inputs.output-format }}
         INPUT_SARIF: ${{ inputs.sarif }}
         INPUT_BASELINE: ${{ inputs.baseline }}
@@ -140,10 +176,26 @@ runs:
         INPUT_CVSS_SUITE: ${{ inputs.cvss-suite }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
         INPUT_GITLAB_TOKEN: ${{ inputs.gitlab-token }}
+        INPUT_ECOSYSTEMS_EMAIL: ${{ inputs.ecosystems-email }}
         INPUT_VERSION: ${{ inputs.version }}
         INPUT_EXTRA_ARGS: ${{ inputs.extra-args }}
       run: |
         set -euo pipefail
+
+        # Reject contradictory inputs before spending a gem install (and, for the
+        # sbom + baseline/cyclonedx pair, a full cross-ecosystem audit) on a run
+        # that can only end in still_active's own exit 2. The message names the
+        # action's inputs, which is what the user wrote, not the gem's flags.
+        if [ -n "${INPUT_SBOM}" ]; then
+          if [ -n "${INPUT_GEMFILE_PATH}" ] || [ -n "${INPUT_GEMS}" ]; then
+            echo "::error::sbom is mutually exclusive with gemfile-path and gems; pick one input source."
+            exit 2
+          fi
+          if [ -n "${INPUT_BASELINE}" ] || [ -n "${INPUT_CYCLONEDX}" ]; then
+            echo "::error::baseline and cyclonedx are not supported with sbom (they need the native Ruby audit's lockfile/snapshot); use sarif, or output-format terminal/markdown/json."
+            exit 2
+          fi
+        fi
 
         echo "::group::Installing still_active"
         if [ "${INPUT_VERSION}" = "latest" ]; then
@@ -185,6 +237,10 @@ runs:
         fi
 
         args=()
+
+        if [ -n "${INPUT_SBOM}" ]; then
+          args+=("--sbom=${INPUT_SBOM}")
+        fi
 
         if [ -n "${INPUT_GEMFILE_PATH}" ]; then
           args+=("--gemfile=${INPUT_GEMFILE_PATH}")
@@ -243,6 +299,32 @@ runs:
 
         if [ -n "${INPUT_FAIL_IF_OUTDATED}" ]; then
           args+=("--fail-if-outdated=${INPUT_FAIL_IF_OUTDATED}")
+        fi
+
+        # Bare --fail-if-poison gates at warning and above; =TIER sets it explicitly.
+        case "${INPUT_FAIL_IF_POISON}" in
+          ""|false) : ;;
+          true) args+=("--fail-if-poison") ;;
+          note|warning|critical) args+=("--fail-if-poison=${INPUT_FAIL_IF_POISON}") ;;
+          *)
+            echo "::error::fail-if-poison must be true/false or one of: note, warning, critical."
+            exit 2
+            ;;
+        esac
+
+        # Bare --fail-if-language-ceiling gates the critical (EOL-forced) tier only.
+        case "${INPUT_FAIL_IF_LANGUAGE_CEILING}" in
+          ""|false) : ;;
+          true) args+=("--fail-if-language-ceiling") ;;
+          note|warning|critical) args+=("--fail-if-language-ceiling=${INPUT_FAIL_IF_LANGUAGE_CEILING}") ;;
+          *)
+            echo "::error::fail-if-language-ceiling must be true/false or one of: note, warning, critical."
+            exit 2
+            ;;
+        esac
+
+        if [ -n "${INPUT_ECOSYSTEMS_EMAIL}" ]; then
+          args+=("--ecosystems-email=${INPUT_ECOSYSTEMS_EMAIL}")
         fi
 
         # Independent modifier: works alongside any output mode (terminal/markdown/json/sarif).
