@@ -79,6 +79,7 @@ Read the gem's [Upgrading to 3.0](https://github.com/SeanLF/still_active/blob/ma
 | `fail-if-vulnerable` | Exit 1 on vulns; `true`/`false` or `low`/`medium`/`high`/`critical` | `false` |
 | `fail-if-outdated` | Exit 1 if any gem exceeds N libyears behind latest | – |
 | `fail-if-poison` | Exit 1 on a poison-pill cap; `true`/`false` or `note`/`warning`/`critical` (still_active ≥ 3.0.0) | `false` |
+| `fail-if-deprecated` | Exit 1 if a dependency's maintainer has deprecated it. No tier: a deprecation is declared, not scored. Needs still_active > 3.0.0.rc6 | `false` |
 | `fail-if-language-ceiling` | Exit 1 on an EOL language-runtime ceiling; `true`/`false` or `note`/`warning`/`critical` (still_active ≥ 3.0.0) | `false` |
 | `output-format` | `terminal`, `markdown`, or `json` | `json` |
 | `sarif` | Path to write SARIF 2.1.0 output to (e.g. `still_active.sarif.json`) | – |
@@ -147,6 +148,7 @@ Constraints, all enforced by the action before it installs anything, so a mis-wi
 Two opt-in gates, both still_active ≥ 3.0.0, both off by default:
 
 - **`fail-if-poison`** fires when a dormant or archived package caps one of its runtime dependencies below that dependency's latest major, a ceiling no upstream release will lift. `true` gates at `warning` and above (the gem's default tier); pass `note`, `warning`, or `critical` to set the threshold yourself. The strongest case, a dead package pinning a dependency below the version that patches a HIGH advisory, leads the report.
+- **`fail-if-deprecated`** fires when a dependency's maintainer has declared it deprecated in its registry. Unlike every other gate this is not inferred from dates or repository state: the person publishing the package said to stop using it, and the deprecation message usually names the successor. It is the only gate that can fire on a package every date-based signal reads as healthy, so it complements `fail-if-warning` rather than overlapping it. Boolean, no tier, because a deprecation is not scored.
 - **`fail-if-language-ceiling`** fires when a pinned dependency's `required_ruby_version` (or `requires_python`, or a NuGet target framework) forbids every supported runtime, stranding you on an end-of-life one. `true` gates the `critical` (EOL-forced) tier only; `note` also gates the "latest doesn't support your runtime yet" FYI tier. `warning` behaves as `critical`, since this signal only ever produces the other two tiers.
 
 ```yaml

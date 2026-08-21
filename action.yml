@@ -48,6 +48,16 @@ inputs:
       tier), or name a tier: note, warning, critical. Requires still_active >= 3.0.0.
     required: false
     default: 'false'
+  fail-if-deprecated:
+    description: |
+      Exit 1 if any dependency's maintainer has declared it deprecated in its
+      registry. A boolean with no tier, because a deprecation is not scored: the
+      maintainer either declared it or did not. The only gate that can fire on a
+      package every date-based signal reads as healthy, so it is worth enabling
+      alongside the activity gates rather than instead of them. Requires a
+      still_active newer than 3.0.0.rc6.
+    required: false
+    default: 'false'
   fail-if-language-ceiling:
     description: |
       Exit 1 when a pinned dependency strands you on an end-of-life language
@@ -162,6 +172,7 @@ runs:
         INPUT_GEMS: ${{ inputs.gems }}
         INPUT_SBOM: ${{ inputs.sbom }}
         INPUT_IGNORE: ${{ inputs.ignore }}
+        INPUT_FAIL_IF_DEPRECATED: ${{ inputs.fail-if-deprecated }}
         INPUT_FAIL_IF_WARNING: ${{ inputs.fail-if-warning }}
         INPUT_FAIL_IF_VULNERABLE: ${{ inputs.fail-if-vulnerable }}
         INPUT_FAIL_IF_OUTDATED: ${{ inputs.fail-if-outdated }}
@@ -306,6 +317,10 @@ runs:
               exit 2
               ;;
           esac
+        fi
+
+        if [ "${INPUT_FAIL_IF_DEPRECATED}" = "true" ]; then
+          args+=("--fail-if-deprecated")
         fi
 
         if [ "${INPUT_FAIL_IF_WARNING}" = "true" ]; then
