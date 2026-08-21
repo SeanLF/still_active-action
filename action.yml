@@ -26,6 +26,13 @@ inputs:
       Gems to exclude from pass/fail checks (still shown in output).
       Accepts a comma-separated list or a YAML block scalar with one gem per line.
     required: false
+  fail-if-critical:
+    description: |
+      Exit 1 only if a gem's activity is critical or archived, ignoring the milder
+      stale/warning band. The narrower sibling of fail-if-warning; use this when a
+      warning-level finding should not fail the build. "true" to enable.
+    required: false
+    default: 'false'
   fail-if-warning:
     description: 'Exit 1 if any gem has stale/critical/archived activity. "true" to enable.'
     required: false
@@ -161,6 +168,7 @@ runs:
         INPUT_GEMS: ${{ inputs.gems }}
         INPUT_SBOM: ${{ inputs.sbom }}
         INPUT_IGNORE: ${{ inputs.ignore }}
+        INPUT_FAIL_IF_CRITICAL: ${{ inputs.fail-if-critical }}
         INPUT_FAIL_IF_WARNING: ${{ inputs.fail-if-warning }}
         INPUT_FAIL_IF_VULNERABLE: ${{ inputs.fail-if-vulnerable }}
         INPUT_FAIL_IF_OUTDATED: ${{ inputs.fail-if-outdated }}
@@ -281,6 +289,10 @@ runs:
               exit 2
               ;;
           esac
+        fi
+
+        if [ "${INPUT_FAIL_IF_CRITICAL}" = "true" ]; then
+          args+=("--fail-if-critical")
         fi
 
         if [ "${INPUT_FAIL_IF_WARNING}" = "true" ]; then
