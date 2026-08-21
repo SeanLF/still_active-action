@@ -181,9 +181,9 @@ jobs:
           github-token: ${{ github.token }}
           sbom: fixtures/sbom/sbom.cdx.json
           bundler-audit: 'false'
-          # --sbom landed in 3.0.0, still a prerelease, so `latest` (2.0.0) can't
-          # run this job. Drop the pin once 3.0.0 is published non-prerelease.
-          version: '3.0.0.rc6'
+          # 3.0.0 is published, so `latest` now resolves to it. Left unpinned
+          # deliberately: this job is what catches the action breaking against the
+          # version its users actually get by default.
       - name: Assert every fixture package was assessed across all four ecosystems
         env:
           REPORT: ${{ steps.run.outputs.report-path }}
@@ -192,6 +192,37 @@ jobs:
           jq -e '.summary.total_assessed == 4' "$REPORT"
           jq -e '.summary.unassessable_count == 0' "$REPORT"
           jq -e '[.dependencies | keys[] | split("/")[0]] | unique == ["cargo", "go", "npm", "pypi"]' "$REPORT"
+
+  sbom-cyclonedx:
+    name: Enriched SBOM out (sbom + cyclonedx)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - id: run
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          sbom: fixtures/sbom/sbom.cdx.json
+          cyclonedx: enriched.cdx.json
+          bundler-audit: 'false'
+      - name: Assert the enriched SBOM re-emits the input's own purls
+        run: |
+          test -f enriched.cdx.json
+          jq -e '.bomFormat == "CycloneDX"' enriched.cdx.json
+          # The point of the feature: nothing is reconstructed, so every purl in
+          # the output must appear verbatim in the input.
+          jq -r '.components[].purl' enriched.cdx.json | sort > out.purls
+          jq -r '.components[].purl' fixtures/sbom/sbom.cdx.json | sort > in.purls
+          invented="$(comm -23 out.purls in.purls)"
+          if [ -n "${invented}" ]; then
+            echo "::error::purls in the output that were not in the input: ${invented}"
+            exit 1
+          fi
+          # And the maintenance signals the input could not carry are attached.
+          jq -e '[.components[].properties // [] | .[].name] | index("still_active:status")' enriched.cdx.json
 
   sbom-conflict:
     name: SBOM input conflicts fail fast
@@ -247,9 +278,7 @@ jobs:
           fail-if-poison: 'note'
           fail-if-language-ceiling: 'note'
           bundler-audit: 'false'
-          # Both gates landed in 3.0.0, still a prerelease, so `latest` (2.0.0)
-          # would reject them. Drop the pin once 3.0.0 ships non-prerelease.
-          version: '3.0.0.rc6'
+          # 3.0.0 is published, so `latest` resolves to it and these gates exist.
       - name: Assert the gates parsed (exit 2 means a rejected flag or tier)
         run: |
           if [ "${{ steps.run.outputs.exit-code }}" = "2" ]; then
