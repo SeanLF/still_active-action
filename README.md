@@ -75,6 +75,7 @@ Read the gem's [Upgrading to 3.0](https://github.com/SeanLF/still_active/blob/ma
 | `gems` | Comma-separated gem list (alternative to `gemfile-path`) | – |
 | `sbom` | Path to a CycloneDX SBOM to audit cross-ecosystem instead of a Gemfile (still_active ≥ 3.0.0) | – |
 | `ignore` | Gems to exclude from pass/fail (comma list or YAML block) | – |
+| `fail-if-critical` | Exit 1 only on critical/archived activity, ignoring the stale/warning band (the narrower sibling of `fail-if-warning`) | `false` |
 | `fail-if-warning` | Exit 1 on stale/critical/archived activity (`true`/`false`) | `false` |
 | `fail-if-vulnerable` | Exit 1 on vulns; `true`/`false` or `low`/`medium`/`high`/`critical` | `false` |
 | `fail-if-outdated` | Exit 1 if any gem exceeds N libyears behind latest | – |

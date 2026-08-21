@@ -64,6 +64,36 @@ jobs:
             exit 1
           fi
 
+  archived-critical:
+    name: Archived fixture, critical gate only (exit 1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Resolve fixture lockfile
+        working-directory: fixtures/archived
+        run: bundle lock
+      - id: run
+        continue-on-error: true
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          gemfile-path: fixtures/archived/Gemfile
+          # The narrower gate, which the action never exposed before. An archived
+          # gem is in the critical band, so this must fail exactly as the broader
+          # fail-if-warning does; what it pins down is that the flag reaches the gem
+          # rather than being silently dropped.
+          fail-if-critical: 'true'
+          bundler-audit: 'false'
+      - name: Assert exit code 1
+        run: |
+          if [ "${{ steps.run.outputs.exit-code }}" != "1" ]; then
+            echo "::error::Expected exit-code=1 for archived fixture under fail-if-critical, got '${{ steps.run.outputs.exit-code }}'"
+            exit 1
+          fi
+
   sarif:
     name: SARIF output
     runs-on: ubuntu-latest
