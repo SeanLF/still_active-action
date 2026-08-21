@@ -18,8 +18,9 @@ inputs:
       Path to a CycloneDX SBOM (e.g. from Syft or Trivy) to audit cross-ecosystem:
       npm, PyPI, Cargo, Go, Maven, and NuGet packages get the same maintenance
       signals gems do. Mutually exclusive with gemfile-path and gems, and does not
-      support baseline or cyclonedx (use sarif, or output-format terminal/markdown/json).
-      Requires still_active >= 3.0.0.
+      support baseline (use sarif, cyclonedx, or output-format terminal/markdown/json).
+      Requires still_active >= 3.0.0; combining it with cyclonedx, which emits an
+      enriched SBOM, needs a newer still_active than 3.0.0.rc6.
     required: false
   ignore:
     description: |
@@ -183,7 +184,7 @@ runs:
         set -euo pipefail
 
         # Reject contradictory inputs before spending a gem install (and, for the
-        # sbom + baseline/cyclonedx pair, a full cross-ecosystem audit) on a run
+        # sbom + baseline pair, a full cross-ecosystem audit) on a run
         # that can only end in still_active's own exit 2. The message names the
         # action's inputs, which is what the user wrote, not the gem's flags.
         if [ -n "${INPUT_SBOM}" ]; then
@@ -191,8 +192,13 @@ runs:
             echo "::error::sbom is mutually exclusive with gemfile-path and gems; pick one input source."
             exit 2
           fi
-          if [ -n "${INPUT_BASELINE}" ] || [ -n "${INPUT_CYCLONEDX}" ]; then
-            echo "::error::baseline and cyclonedx are not supported with sbom (they need the native Ruby audit's lockfile/snapshot); use sarif, or output-format terminal/markdown/json."
+          # cyclonedx used to be rejected here too. still_active 3.0.0 emits an
+          # ENRICHED SBOM on that combination (the input re-annotated with the
+          # maintenance signals, for Dependency-Track), so only baseline is still
+          # impossible: a maintenance-regression diff needs a snapshot shape a
+          # cross-ecosystem SBOM cannot supply.
+          if [ -n "${INPUT_BASELINE}" ]; then
+            echo "::error::baseline is not supported with sbom (it needs the native Ruby audit's gems/ruby snapshot); use sarif, cyclonedx, or output-format terminal/markdown/json."
             exit 2
           fi
         fi
@@ -255,6 +261,25 @@ runs:
           if [ -n "${normalised_ignore}" ]; then
             args+=("--ignore=${normalised_ignore}")
           fi
+        fi
+
+        # The action can only emit one output mode, and picks the same one
+        # still_active would. Say so rather than dropping a flag in silence.
+        # This annotates, it does not protect: when a mode loses, its *-path output
+        # is never written, so a downstream upload-artifact step still sees an empty
+        # path and still succeeds. Failing the step would prevent that, and is not
+        # done here because setting two modes has always been accepted on the native
+        # path and erroring now would break pipelines working as intended.
+        # Covers the three path-taking modes only; output-format is the fallback
+        # when none is set, so it is not a competing selection to warn about.
+        # extra-args is appended later and unparsed, so a mode flag injected there
+        # is invisible here and the gem's own warning is the one that will be right.
+        selected_modes=()
+        [ -n "${INPUT_BASELINE}" ] && selected_modes+=("baseline")
+        [ -n "${INPUT_SARIF}" ] && selected_modes+=("sarif")
+        [ -n "${INPUT_CYCLONEDX}" ] && selected_modes+=("cyclonedx")
+        if [ "${#selected_modes[@]}" -gt 1 ]; then
+          echo "::warning::multiple output modes set (${selected_modes[*]}); using ${selected_modes[0]}, ignoring the rest. Run the action twice to produce more than one."
         fi
 
         if [ -n "${INPUT_BASELINE}" ]; then
