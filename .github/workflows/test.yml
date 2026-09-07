@@ -379,7 +379,7 @@ jobs:
           job_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs?per_page=100" \
             --jq '.jobs[] | select(.name | startswith("cvss-suite input is a no-op")) | .id')"
           test -n "${job_id}"
-          gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}/logs" > job.log
+          gh api --allow-escape-sequences "repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}/logs" > job.log
           test -s job.log
           grep -q 'The cvss-suite input is deprecated and did nothing' job.log
           installs="$(grep -c 'Installing cvss-suite (CVSS 4.0 scoring' job.log || true)"
