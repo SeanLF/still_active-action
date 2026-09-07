@@ -381,9 +381,12 @@ jobs:
           test -n "${job_id}"
           gh api --allow-escape-sequences "repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}/logs" > job.log
           test -s job.log
-          grep -q 'The cvss-suite input is deprecated and did nothing' job.log
-          installs="$(grep -c 'Installing cvss-suite (CVSS 4.0 scoring' job.log || true)"
-          if [ "${installs}" != "1" ]; then
-            echo "::error::Expected exactly one cvss-suite install group (the pinned 3.0.0 run), found ${installs}"
+          # The runner echoes the action's script into the log, so the raw
+          # "::warning::" and "::group::" text appears whether or not the branch ran.
+          # Only an executed workflow command renders as ##[warning] / ##[group].
+          warnings="$(grep -F -c '##[warning]The cvss-suite input is deprecated and did nothing' job.log || true)"
+          installs="$(grep -F -c '##[group]Installing cvss-suite (CVSS 4.0 scoring' job.log || true)"
+          if [ "${warnings}" != "1" ] || [ "${installs}" != "1" ]; then
+            echo "::error::Expected exactly one deprecation warning (the latest run) and one cvss-suite install group (the pinned 3.0.0 run); found ${warnings} and ${installs}"
             exit 1
           fi
