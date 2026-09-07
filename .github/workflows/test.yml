@@ -317,3 +317,47 @@ jobs:
         run: |
           test -n "$REPORT" && test -f "$REPORT"
           jq -e '.gems.nested_form.alternatives | length > 0' "$REPORT"
+
+  cvss-suite-deprecated:
+    name: cvss-suite input is a no-op on >= 3.1.0 and still installs on 3.0.x
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Resolve fixture lockfile
+        working-directory: fixtures/green
+        run: bundle lock
+      - id: latest
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          gemfile-path: fixtures/green/Gemfile
+          cvss-suite: 'true'
+          bundler-audit: 'false'
+      - name: Assert the deprecated input is accepted and cvss-suite came in as a dependency
+        run: |
+          if [ "${{ steps.latest.outputs.exit-code }}" != "0" ]; then
+            echo "::error::Expected exit-code=0 with the deprecated input on latest, got '${{ steps.latest.outputs.exit-code }}'"
+            exit 1
+          fi
+          # Dependency, not the input's install: exactly one cvss-suite, required by still_active.
+          gem dependency still_active | grep -q 'cvss-suite'
+      - name: Remove cvss-suite so the 3.0.x path starts from the state it targets
+        run: gem uninstall still_active cvss-suite --all --executables --ignore-dependencies
+      - id: pinned
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          gemfile-path: fixtures/green/Gemfile
+          version: '3.0.0'
+          cvss-suite: 'true'
+          bundler-audit: 'false'
+      - name: Assert the input still installs cvss-suite for a pinned 3.0.x
+        run: |
+          if [ "${{ steps.pinned.outputs.exit-code }}" != "0" ]; then
+            echo "::error::Expected exit-code=0 on pinned 3.0.0, got '${{ steps.pinned.outputs.exit-code }}'"
+            exit 1
+          fi
+          gem list -i cvss-suite
