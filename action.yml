@@ -115,11 +115,10 @@ inputs:
     default: 'true'
   cvss-suite:
     description: |
-      Install cvss-suite so still_active can score advisories that publish only a CVSS 4.0
-      vector (no CVSS 3.x, no numeric score). Without it those advisories stay unscored, and
-      under still_active >= 3.0.0 an unscored advisory fails the fail-if-vulnerable severity
-      gate closed (see the upgrade note in the README). Opt-in; set "true" to enable.
-      Requires still_active >= 3.0.0.
+      DEPRECATED, remove it. still_active >= 3.1.0 declares cvss-suite as a dependency, so
+      CVSS-4.0-only advisories are always scored and this input does nothing (a warning
+      says so). It still installs the gem for a pinned still_active 3.0.x, where scoring a
+      CVSS-4.0-only advisory was opt-in.
     required: false
     default: 'false'
   github-token:
@@ -245,20 +244,23 @@ runs:
           echo "::endgroup::"
         fi
 
-        # Optional CVSS 4.0 scorer. still_active soft-requires cvss-suite at runtime; with it
-        # installed, advisories that carry only a CVSS 4.0 vector get a numeric score and can
-        # clear the fail-if-vulnerable severity gate when they land below threshold. Without it
-        # (still_active >= 3.0.0) those advisories stay unscored and fail the gate closed.
+        # DEPRECATED input. still_active >= 3.1.0 declares cvss-suite itself, so the gem
+        # is already present after the install above and there is nothing to do but say
+        # so. Only a pinned 3.0.x (cvss-suite optional there) still needs the install.
         if [ "${INPUT_CVSS_SUITE}" = "true" ]; then
-          echo "::group::Installing cvss-suite (CVSS 4.0 scoring)"
-          # Best-effort: a failed install (set -e is active) must not abort the audit;
-          # still_active just leaves CVSS-4-only advisories unscored (fail-closed under the gate).
-          if gem install cvss-suite --no-document; then
-            echo "cvss-suite ready; still_active will score CVSS-4-only advisories"
+          if gem list -i cvss-suite >/dev/null; then
+            echo "::warning::The cvss-suite input is deprecated and did nothing: still_active >= 3.1.0 ships cvss-suite as a dependency. Remove the input."
           else
-            echo "::warning::cvss-suite install failed; CVSS-4-only advisories stay unscored"
+            echo "::group::Installing cvss-suite (CVSS 4.0 scoring, still_active 3.0.x)"
+            # Best-effort: a failed install (set -e is active) must not abort the audit;
+            # still_active just leaves CVSS-4-only advisories unscored (fail-closed under the gate).
+            if gem install cvss-suite --no-document; then
+              echo "cvss-suite ready; still_active will score CVSS-4-only advisories"
+            else
+              echo "::warning::cvss-suite install failed; CVSS-4-only advisories stay unscored"
+            fi
+            echo "::endgroup::"
           fi
-          echo "::endgroup::"
         fi
 
         args=()

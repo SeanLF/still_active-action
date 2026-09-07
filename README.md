@@ -45,11 +45,11 @@ The action installs `still_active` at `version: latest` by default, so **the day
 
 If a run goes green → red after the upgrade, you have three levers:
 
-- **Enable `cvss-suite: 'true'`.** Some advisories are unscored only because they publish a CVSS **4.0** vector and nothing else; still_active needs the optional `cvss-suite` gem to read a 4.0 vector. Installing it lets those advisories score, and they clear the gate when they land below your threshold.
+- **Upgrade to still_active 3.1.0 or later** (the default `version: latest` already is). Some advisories are unscored only because they publish a CVSS **4.0** vector and nothing else; 3.1.0 ships the `cvss-suite` gem that reads a 4.0 vector, so those advisories score and clear the gate when they land below your threshold. On a pinned 3.0.x, set `cvss-suite: 'true'` to install it.
 - **Accept a specific finding** in a committed `.still_active.yml` (a vulnerability suppression must name an explicit advisory id, so a *newly* disclosed CVE on the same gem still fails). This is the right move for an advisory you've reviewed and decided to carry.
 - **Pin `version:`** to a `2.x` release to defer the change while you triage. Deferral, not a fix; the fail-open it closes is a real one.
 
-The `cvss-suite` input is opt-in (`false` by default) and mirrors the `bundler-audit` toggle: it adds one `gem install` step, best-effort (a failed install never aborts the audit, the advisory just stays unscored).
+The `cvss-suite` input is deprecated: on still_active ≥ 3.1.0 it does nothing and emits a warning asking you to remove it. It still installs the gem (best-effort) for a pinned 3.0.x.
 
 **2. Tokenless runs now resolve GitHub repo signals through ecosyste.ms.** Without a `github-token`, gems that used to hit the 60/hour API wall and degrade to `unknown` now resolve to a real `stale`/`critical`/`archived`, which can trip `fail-if-warning` for the first time. Runs that pass a token are unaffected.
 
@@ -89,7 +89,7 @@ Read the gem's [Upgrading to 3.0](https://github.com/SeanLF/still_active/blob/ma
 | `cyclonedx-version` | CycloneDX spec version: `1.6` (default) or `1.7`; only with `cyclonedx` | – |
 | `alternatives` | Suggest maintained alternatives (Ruby Toolbox leads) for archived/critical gems (`true`/`false`, still_active ≥ 1.6.0) | `false` |
 | `bundler-audit` | Install bundler-audit + fetch ruby-advisory-db for dual-source vulns (`true`/`false`, still_active ≥ 1.5.0) | `true` |
-| `cvss-suite` | Install cvss-suite to score CVSS-4.0-only advisories (`true`/`false`, still_active ≥ 3.0.0; see [Upgrading to still_active 3.0](#upgrading-to-still_active-30)) | `false` |
+| `cvss-suite` | **Deprecated.** No-op on still_active ≥ 3.1.0 (cvss-suite is a dependency there); installs it for a pinned 3.0.x | `false` |
 | `github-token` | GitHub token — pass `${{ github.token }}` explicitly to avoid rate limits | – |
 | `gitlab-token` | GitLab token (optional for public repos) | – |
 | `ecosystems-email` | Contact email for the ecosyste.ms polite pool (still_active ≥ 3.0.0) | – |
