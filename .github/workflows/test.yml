@@ -361,3 +361,29 @@ jobs:
             exit 1
           fi
           gem list -i cvss-suite
+
+  cvss-suite-deprecated-log:
+    name: cvss-suite input warned on latest and installed exactly once (for 3.0.x)
+    # End state alone cannot tell "warned and skipped" from "silently reinstalled"
+    # (gem install is idempotent), so this reads the finished job's log.
+    needs: cvss-suite-deprecated
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Assert the log of the previous job
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          job_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name | startswith("cvss-suite input is a no-op")) | .id')"
+          test -n "${job_id}"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}/logs" > job.log
+          test -s job.log
+          grep -q 'The cvss-suite input is deprecated and did nothing' job.log
+          installs="$(grep -c 'Installing cvss-suite (CVSS 4.0 scoring' job.log || true)"
+          if [ "${installs}" != "1" ]; then
+            echo "::error::Expected exactly one cvss-suite install group (the pinned 3.0.0 run), found ${installs}"
+            exit 1
+          fi
