@@ -138,6 +138,18 @@ inputs:
       github-token is set. Echoed in the workflow log with the rest of the command,
       so prefer a role address over a personal one. Requires still_active >= 3.0.0.
     required: false
+  cache:
+    description: |
+      Keep still_active's on-disk cache of public sources' answers
+      (~/.cache/still_active/http) across runs with actions/cache, so a rerun, or a
+      baseline and a current audit, don't ask every question again. Each answer is
+      trusted only as long as it holds (which advisories affect a version, one hour;
+      advisory scores, six), so a restored cache can't hide a new advisory for longer
+      than that. Saved even when the audit fails a gate. Uses actions/cache, which
+      needs Actions Runner 2.327.1 or newer; on an older self-hosted runner set
+      "false", which skips the cache and passes --no-cache (still_active >= 3.2.0).
+    required: false
+    default: 'true'
   version:
     description: 'still_active gem version to install. "latest" or a pinned version like "1.4.0".'
     required: false
@@ -166,10 +178,33 @@ outputs:
   cyclonedx-path:
     description: 'Path to the CycloneDX SBOM file when cyclonedx wrote to a file (empty for stdout or when unused).'
     value: ${{ steps.run.outputs.cyclonedx-path }}
+  cache-key:
+    description: 'The key this run saved the answer cache under (empty when cache is false).'
+    value: ${{ steps.cache-key.outputs.key }}
 
 runs:
   using: 'composite'
   steps:
+    # A key per invocation (a matrix job, or a second audit in the same job, saves
+    # its own answers rather than losing a race for a shared key), restored from
+    # the newest one: the cache's own lifetimes decide what's still good. A second
+    # call in a job already has the first call's answers on disk, so it doesn't
+    # restore older ones over them.
+    - id: cache-key
+      if: inputs.cache == 'true'
+      shell: bash
+      run: |
+        echo "key=still-active-http-${RUNNER_OS}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${GITHUB_JOB}-$(date +%s)-${RANDOM}${RANDOM}" >> "${GITHUB_OUTPUT}"
+        if [ -n "$(find ~/.cache/still_active/http -name '*.json' -print -quit 2>/dev/null)" ]; then
+          echo "present=true" >> "${GITHUB_OUTPUT}"
+        fi
+    - if: inputs.cache == 'true' && steps.cache-key.outputs.present != 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/.cache/still_active/http
+        key: ${{ steps.cache-key.outputs.key }}
+        restore-keys: |
+          still-active-http-${{ runner.os }}-
     - id: run
       shell: bash
       working-directory: ${{ inputs.working-directory }}
@@ -191,6 +226,7 @@ runs:
         INPUT_CYCLONEDX: ${{ inputs.cyclonedx }}
         INPUT_CYCLONEDX_VERSION: ${{ inputs.cyclonedx-version }}
         INPUT_ALTERNATIVES: ${{ inputs.alternatives }}
+        INPUT_CACHE: ${{ inputs.cache }}
         INPUT_BUNDLER_AUDIT: ${{ inputs.bundler-audit }}
         INPUT_CVSS_SUITE: ${{ inputs.cvss-suite }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
@@ -386,6 +422,16 @@ runs:
           args+=("--alternatives")
         fi
 
+        # still_active >= 3.2.0 caches by default; the flag only exists from 3.2.0.
+        case "${INPUT_CACHE}" in
+          ""|true) : ;;
+          false) args+=("--no-cache") ;;
+          *)
+            echo "::error::cache must be true or false."
+            exit 2
+            ;;
+        esac
+
         if [ -n "${INPUT_EXTRA_ARGS}" ]; then
           # shellcheck disable=SC2206
           extra=( ${INPUT_EXTRA_ARGS} )
@@ -422,3 +468,11 @@ runs:
         fi
 
         exit "${exit_code}"
+
+    # Saved even when the audit failed a gate: that is the run most likely to be
+    # rerun, and its answers are as good as a passing run's.
+    - if: always() && inputs.cache == 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.cache/still_active/http
+        key: ${{ steps.cache-key.outputs.key }}

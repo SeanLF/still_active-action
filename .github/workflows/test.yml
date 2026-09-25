@@ -293,6 +293,101 @@ jobs:
               ;;
           esac
 
+  # The first job's audit saves the cache; the second restores it by the same
+  # prefix the action restores with, so a later run starts from those answers.
+  cache-save:
+    name: Cache is saved after an audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Resolve fixture lockfile
+        working-directory: fixtures/green
+        run: bundle lock
+      - id: run
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          gemfile-path: fixtures/green/Gemfile
+          bundler-audit: 'false'
+      - name: Assert the audit wrote cache entries
+        run: test -n "$(find ~/.cache/still_active/http -name '*.json' -print -quit)"
+    outputs:
+      cache-key: ${{ steps.run.outputs.cache-key }}
+
+  # By this invocation's exact key, so a cache some earlier run saved can't pass it.
+  cache-restore:
+    name: Cache is restored by a later run
+    needs: cache-save
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/still_active/http
+          key: ${{ needs.cache-save.outputs.cache-key }}
+          fail-on-cache-miss: true
+      - name: Assert entries came back
+        run: test -n "$(find ~/.cache/still_active/http -name '*.json' -print -quit)"
+
+  # A tripped gate fails the step; the answers must still be saved.
+  cache-save-on-failure:
+    name: Cache is saved even when a gate fails
+    runs-on: ubuntu-latest
+    outputs:
+      cache-key: ${{ steps.run.outputs.cache-key }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Resolve fixture lockfile
+        working-directory: fixtures/archived
+        run: bundle lock
+      - id: run
+        continue-on-error: true
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          gemfile-path: fixtures/archived/Gemfile
+          fail-if-critical: 'true'
+          bundler-audit: 'false'
+      - name: Assert the gate did fail
+        run: test "${{ steps.run.outputs.exit-code }}" = "1"
+
+  cache-restore-after-failure:
+    name: A failed run's cache is restorable
+    needs: cache-save-on-failure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/still_active/http
+          key: ${{ needs.cache-save-on-failure.outputs.cache-key }}
+          fail-on-cache-miss: true
+
+  no-cache:
+    name: cache false passes --no-cache and writes nothing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Resolve fixture lockfile
+        working-directory: fixtures/green
+        run: bundle lock
+      - id: run
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
+          gemfile-path: fixtures/green/Gemfile
+          bundler-audit: 'false'
+          cache: 'false'
+      - name: Assert no cache entries were written
+        run: test -z "$(find ~/.cache/still_active/http -name '*.json' -print -quit 2>/dev/null)"
+
   alternatives:
     name: Alternative gem leads
     runs-on: ubuntu-latest

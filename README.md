@@ -88,6 +88,7 @@ Read the gem's [Upgrading to 3.0](https://github.com/SeanLF/still_active/blob/ma
 | `cyclonedx` | Path to write a CycloneDX SBOM to, or `-` for stdout (still_active ≥ 1.5.0) | – |
 | `cyclonedx-version` | CycloneDX spec version: `1.6` (default) or `1.7`; only with `cyclonedx` | – |
 | `alternatives` | Suggest maintained alternatives (Ruby Toolbox leads) for archived/critical gems (`true`/`false`, still_active ≥ 1.6.0) | `false` |
+| `cache` | Keep still_active's cache of public sources' answers across runs with `actions/cache` (still_active ≥ 3.2.0). Which advisories affect a version is trusted for an hour, advisory scores for six. Saved even when a gate fails. Needs Actions Runner ≥ 2.327.1; `false` skips it and passes `--no-cache` (still_active ≥ 3.2.0). A `pull_request_target` workflow that runs untrusted code before this action should set `false`, since it saves to the base branch's cache | `true` |
 | `bundler-audit` | Install bundler-audit + fetch ruby-advisory-db for dual-source vulns (`true`/`false`, still_active ≥ 1.5.0) | `true` |
 | `cvss-suite` | **Deprecated.** No-op on still_active ≥ 3.1.0 (cvss-suite is a dependency there); installs it for a pinned 3.0.x | `false` |
 | `github-token` | GitHub token — pass `${{ github.token }}` explicitly to avoid rate limits | – |
